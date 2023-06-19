@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections.abc import ItemsView, Iterator, KeysView, Mapping, ValuesView
 from dataclasses import KW_ONLY, dataclass, fields
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, overload
 
 from stream_ml.core._core.api import Model
 from stream_ml.core._core.base import NN_NAMESPACE
@@ -113,7 +113,36 @@ class ModelsBase(
     # ===============================================================
     # Mapping
 
+    @overload
     def __getitem__(self, key: str) -> Model[Array, NNModel]:
+        ...
+
+    @overload
+    def __getitem__(self, key: list[str]) -> ModelsBase[Array, NNModel]:
+        ...
+
+    @overload
+    def __getitem__(self, key: tuple[str, ...]) -> ModelsBase[Array, NNModel]:
+        ...
+
+    def __getitem__(
+        self, key: str | list[str] | tuple[str, ...]
+    ) -> Model[Array, NNModel]:
+        if isinstance(key, list):
+            return self.__class__(
+                {k: self.components[k] for k in key},
+                name=self.name,
+                priors=self.priors,
+                unpack_params_hooks=self.unpack_params_hooks,
+            )
+        elif isinstance(key, tuple):
+            if len(key) == 0:
+                return self
+            submodel = self.components[key[0]]
+            if isinstance(submodel, ModelsBase):
+                return submodel[key[1:]]
+            else:
+                raise KeyError(key)
         return self.components[key]
 
     def __iter__(self) -> Iterator[str]:
